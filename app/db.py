@@ -24,12 +24,23 @@ def close_db(e=None):
 @contextmanager
 def db_transaction():
     db = get_db()
+    # 配额判定与写入必须在同一把写锁内完成，否则并发继续可能同时放行超配额。
+    if not db.in_transaction:
+        db.execute("BEGIN IMMEDIATE")
     try:
         yield db
         db.commit()
     except Exception:
         db.rollback()
         raise
+
+
+def _ensure_column(db, table: str, column: str, declaration: str) -> None:
+    columns = {
+        row["name"] for row in db.execute(f"PRAGMA table_info({table})").fetchall()
+    }
+    if column not in columns:
+        db.execute(f"ALTER TABLE {table} ADD COLUMN {column} {declaration}")
 
 
 def init_db(app):
@@ -52,8 +63,44 @@ def init_db(app):
                 title TEXT NOT NULL,
                 payload_json TEXT NOT NULL,
                 fetched_at TEXT NOT NULL DEFAULT (datetime('now')),
+                admitted_date TEXT,
                 UNIQUE(job_id, item_key)
             );
+            CREATE TABLE IF NOT EXISTS catalog_quotas (
+                catalog_id TEXT PRIMARY KEY,
+                daily_quota INTEGER NOT NULL CHECK (daily_quota >= 0)
+            );
+            CREATE TABLE IF NOT EXISTS queue_entries (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                job_id INTEGER NOT NULL REFERENCES crawl_jobs(id) ON DELETE CASCADE,
+                item_key TEXT NOT NULL,
+                sku TEXT NOT NULL DEFAULT '',
+                title TEXT NOT NULL,
+                payload_json TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pending',
+                is_priority INTEGER NOT NULL DEFAULT 0,
+                priority_reason TEXT,
+                priority_at TEXT,
+                queued_at TEXT NOT NULL,
+                queued_date TEXT NOT NULL,
+                admitted_at TEXT,
+                admitted_date TEXT,
+                UNIQUE(job_id, item_key)
+            );
+            CREATE INDEX IF NOT EXISTS idx_queue_job_status
+                ON queue_entries (job_id, status);
             """
+        )
+        # 旧库迁移：入正式结果的日期用于按服务端日期统计配额。
+        _ensure_column(db, "crawl_records", "admitted_date", "TEXT")
+        db.execute(
+            """
+            UPDATE crawl_records
+            SET admitted_date = substr(fetched_at, 1, 10)
+            WHERE admitted_date IS NULL
+            """
+        )
+        db.execute(
+            "CREATE INDEX IF NOT EXISTS idx_records_admitted ON crawl_records (admitted_date)"
         )
         db.commit()

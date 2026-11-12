@@ -11,6 +11,11 @@ CATALOGS = {
     "/mock/catalog/beta": [
         {"sku": "B-101", "title": "泵站运行日报"},
         {"sku": "B-102", "title": "雨污分流抽检单"},
+        {"sku": "B-103", "title": "闸阀巡检表"},
+        {"sku": "B-104", "title": "管段沉降观测记录"},
+        {"sku": "B-105", "title": "用户投诉回访单"},
+        {"sku": "B-106", "title": "夜间巡线异常清单"},
+        {"sku": "", "title": "未编号的临时记录"},
     ],
 }
 
@@ -41,7 +46,7 @@ def parse_catalog_html(html: str, seed_path: str) -> list[dict]:
     import re
 
     pattern = re.compile(
-        r"<li\s+data-sku='([^']+)'\s*>([^<]+)</li>",
+        r"<li\s+data-sku='([^']*)'\s*>([^<]+)</li>",
         re.IGNORECASE,
     )
     out = []

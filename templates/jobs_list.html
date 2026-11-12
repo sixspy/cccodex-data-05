@@ -3,6 +3,7 @@
 {% block body %}
 <section class="card">
   <h1>采集任务</h1>
+  <p class="muted">服务端日期：{{ today }} · 每日配额按目录共享，超过配额的新条目进入排队。</p>
   <form class="grid-form" method="post" action="{{ url_for('jobs.create_job') }}">
     <label>任务名 <input name="name" placeholder="例：alpha 目录首轮" required /></label>
     <label>种子路径
@@ -16,24 +17,56 @@
   </form>
 </section>
 <section class="card">
+  <h2>每日配额</h2>
+  <p class="muted">留空（或从未配置）按默认 5 条；清空后保存即可恢复默认。配额按服务端日期、按目录统计。</p>
+  <table>
+    <thead>
+      <tr><th>目录</th><th>今日已入库</th><th>配额</th><th>排队</th><th>插队</th><th>设置配额</th></tr>
+    </thead>
+    <tbody>
+      {% for c in catalogs %}
+      <tr>
+        <td><code>{{ c.path }}</code></td>
+        <td>{{ c.admitted }}</td>
+        <td>{{ c.quota }}</td>
+        <td>{{ c.queued }}</td>
+        <td>{{ '有' if c.has_priority else '无' }}</td>
+        <td>
+          <form class="inline-form quota-form" method="post" action="{{ url_for('jobs.update_quota') }}">
+            <input type="hidden" name="catalog_id" value="{{ c.path }}" />
+            <input type="number" name="daily_quota" min="0" step="1" value="{{ c.quota }}" />
+            <button type="submit">保存</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+<section class="card">
   <table>
     <thead>
       <tr>
-        <th>ID</th><th>名称</th><th>种子</th><th>状态</th><th>记录数</th><th></th>
+        <th>ID</th><th>名称</th><th>种子</th><th>状态</th><th>记录数</th>
+        <th>目录今日入库 / 配额</th><th>本任务排队</th><th>插队</th><th></th>
       </tr>
     </thead>
     <tbody>
       {% for j in jobs %}
+      {% set s = stats[j.id] %}
       <tr>
         <td>{{ j.id }}</td>
         <td>{{ j.name }}</td>
         <td><code>{{ j.seed_path }}</code></td>
         <td><span class="tag {{ j.status }}">{{ j.status }}</span></td>
         <td>{{ counts.get(j.id, 0) }}</td>
+        <td>{{ s.admitted }} / {{ s.quota }}</td>
+        <td>{{ s.queued }}</td>
+        <td>{{ '有' if s.has_priority else '无' }}</td>
         <td><a href="{{ url_for('jobs.detail', job_id=j.id) }}">详情</a></td>
       </tr>
       {% else %}
-      <tr><td colspan="6" class="muted">尚无任务，请先创建</td></tr>
+      <tr><td colspan="9" class="muted">尚无任务，请先创建</td></tr>
       {% endfor %}
     </tbody>
   </table>

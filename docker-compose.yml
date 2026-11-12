@@ -8,6 +8,7 @@ services:
       HOST: "0.0.0.0"
       PORT: "5590"
       FLASK_DEBUG: "0"
+      APP_TIMEZONE: "Asia/Shanghai"
       DATABASE_PATH: /app/instance/crawl_lab.db
     volumes:
       - crawl_lab_data:/app/instance

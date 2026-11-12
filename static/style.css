@@ -28,6 +28,15 @@ code { font-size: 0.85em; }
 .tag.done { background: #1e4d3a; color: #9fe0c0; }
 .tag.draft { background: #3a4556; }
 .tag.failed { background: #5a2a2a; color: #ffb3b3; }
+.tag.queued { background: #4a3f1e; color: #f0d89a; }
+.tag.pending { background: #4a3f1e; color: #f0d89a; }
+.tag.invalid { background: #5a2a2a; color: #ffb3b3; }
+.tag.admitted { background: #1e4d3a; color: #9fe0c0; }
+.tag.duplicate { background: #3a4556; }
+.stats { display: flex; flex-wrap: wrap; gap: 1rem; }
+.priority-row { background: rgba(61, 139, 253, 0.12); }
+.inline-form { display: flex; gap: 0.4rem; align-items: center; margin: 0; }
+.inline-form input[type="number"] { width: 8.5rem; padding: 0.3rem 0.4rem; }
 .flash { list-style: none; padding: 0 1.25rem; }
 .flash .ok { color: var(--ok); }
 .flash .error { color: var(--err); }

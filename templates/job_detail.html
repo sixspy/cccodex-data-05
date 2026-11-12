@@ -4,28 +4,90 @@
 <p><a href="{{ url_for('jobs.list_jobs') }}">← 返回列表</a></p>
 <section class="card">
   <h1>{{ job.name }}</h1>
-  <p>种子 <code>{{ job.seed_path }}</code> · 状态 <span class="tag {{ job.status }}">{{ job.status }}</span></p>
-  {% if job.status == 'draft' %}
+  <p>种子 <code>{{ job.seed_path }}</code> · 状态 <span class="tag {{ job.status }}">{{ job.status }}</span>
+    · 服务端日期 {{ today }}</p>
+  <p class="stats">
+    <span>目录今日已入库 <strong>{{ stats.admitted }}</strong></span>
+    <span>当日配额 <strong>{{ stats.quota }}</strong></span>
+    <span>排队 <strong>{{ stats.queued }}</strong></span>
+    <span>插队 <strong>{{ '有' if stats.has_priority else '无' }}</strong></span>
+  </p>
+  {% if job.status == 'running' %}
+  <p class="muted">本次运行尚未结束，不能再次触发。</p>
+  {% elif stats.queued %}
+  <form method="post" action="{{ url_for('jobs.run_job_view', job_id=job.id) }}">
+    <button type="submit">继续采集（先进插队，再按排队顺序）</button>
+  </form>
+  <p class="muted">换日之后队列不会自动入库：必须手工点「继续」；继续时仍按新一天的配额放行。</p>
+  {% elif job.status == 'draft' or job.status == 'failed' %}
   <form method="post" action="{{ url_for('jobs.run_job_view', job_id=job.id) }}">
     <button type="submit">运行采集（同步）</button>
   </form>
-  {% elif job.status == 'done' %}
+  {% endif %}
+  {% if job.status == 'done' and stats.queued == 0 %}
   <p class="muted">已完成于 {{ job.finished_at or '—' }}</p>
   {% endif %}
 </section>
+
+<section class="card">
+  <h2>插队</h2>
+  <p class="muted">同一任务同一时刻只允许一条插队，必须填写原因；编码为空的条目不能插队，也不占配额。</p>
+  {% if stats.has_priority %}
+  <p>当前已有插队条目，需等它入库后才能再登记下一条。</p>
+  {% endif %}
+  <form class="grid-form" method="post" action="{{ url_for('jobs.priority_view', job_id=job.id) }}">
+    <label>编码
+      <select name="sku" required>
+        {% for it in catalog_items %}
+        <option value="{{ it.sku }}" {% if not it.sku %}disabled{% endif %}>{{ it.sku or '（空编码）' }} — {{ it.title }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>插队原因 <input name="reason" required placeholder="必填" /></label>
+    <button type="submit">登记插队</button>
+  </form>
+</section>
+
+<section class="card">
+  <h2>待处理队列（插队排在 1 号）</h2>
+  <p class="muted">浏览器里看「排队顺序」列即可：数字越小越先入库；插队条目固定排在最前面。</p>
+  <table>
+    <thead>
+      <tr><th>排队顺序</th><th>编码</th><th>标题</th><th>状态</th><th>插队</th><th>入队日期</th><th>入库日期</th></tr>
+    </thead>
+    <tbody>
+      {% for row in queue_rows %}
+      {% set e = row.entry %}
+      <tr class="{{ 'priority-row' if e.is_priority and e.status == 'pending' else '' }}">
+        <td>{{ row.position if row.position else '—' }}</td>
+        <td><code>{{ e.sku or '（空）' }}</code></td>
+        <td>{{ e.title }}</td>
+        <td><span class="tag {{ e.status }}">{{ e.status }}</span></td>
+        <td>{% if e.is_priority %}插队：{{ e.priority_reason }}{% else %}—{% endif %}</td>
+        <td>{{ e.queued_date }}</td>
+        <td>{{ e.admitted_date or '—' }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7" class="muted">队列为空</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
 <section class="card">
   <h2>落库记录</h2>
   <table>
-    <thead><tr><th>item_key</th><th>标题</th><th>时间</th></tr></thead>
+    <thead><tr><th>item_key</th><th>标题</th><th>入库日期</th><th>时间</th></tr></thead>
     <tbody>
       {% for r in records %}
       <tr>
         <td><code>{{ r.item_key }}</code></td>
         <td>{{ r.title }}</td>
+        <td>{{ r.admitted_date or '—' }}</td>
         <td>{{ r.fetched_at }}</td>
       </tr>
       {% else %}
-      <tr><td colspan="3" class="muted">尚无记录</td></tr>
+      <tr><td colspan="4" class="muted">尚无记录</td></tr>
       {% endfor %}
     </tbody>
   </table>
